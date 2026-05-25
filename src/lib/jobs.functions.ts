@@ -416,7 +416,14 @@ export const rescoreAll = createServerFn({ method: "POST" }).handler(async () =>
     .select("id,title,description,location,is_ai_native,remote_ok,france_ok");
   let updated = 0;
   for (const j of jobs ?? []) {
-    const s = await aiScoreJob(j, prefs);
+    const s = await aiScoreJob({
+      title: j.title,
+      description: j.description ?? undefined,
+      location: j.location ?? undefined,
+      is_ai_native: j.is_ai_native ?? undefined,
+      remote_ok: j.remote_ok ?? undefined,
+      france_ok: j.france_ok ?? undefined,
+    }, prefs);
     await supabaseAdmin
       .from("jobs")
       .update({ fit_score: s.score, fit_reason: s.reason })
