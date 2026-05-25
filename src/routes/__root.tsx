@@ -44,8 +44,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Pipeline — AI-native PM job tracker" },
-      { name: "description", content: "Discover and track AI-native Product Manager roles (remote / France)." },
+      { title: "AI-native PM job hunter" },
+      { name: "description", content: "Hunt AI-native Product Manager roles (remote / France)" },
+      { property: "og:title", content: "AI-native PM job hunter" },
+      { name: "twitter:title", content: "AI-native PM job hunter" },
+      { property: "og:description", content: "Hunt AI-native Product Manager roles (remote / France)" },
+      { name: "twitter:description", content: "Hunt AI-native Product Manager roles (remote / France)" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/eb3387d1-891a-443f-9695-24999a439dc6/id-preview-99f22b16--2ff3725a-c8a2-4420-9eb7-fc225d0563f8.lovable.app-1779696761451.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/eb3387d1-891a-443f-9695-24999a439dc6/id-preview-99f22b16--2ff3725a-c8a2-4420-9eb7-fc225d0563f8.lovable.app-1779696761451.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:type", content: "website" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
