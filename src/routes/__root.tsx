@@ -73,8 +73,8 @@ function NavLink({ to, label }: { to: string; label: string }) {
   return (
     <Link
       to={to}
-      className="text-sm text-muted-foreground transition-colors hover:text-foreground data-[status=active]:text-foreground data-[status=active]:font-semibold"
-      activeProps={{ "data-status": "active" } as React.HTMLAttributes<HTMLAnchorElement>}
+      className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+      activeProps={{ className: "text-sm text-foreground font-semibold" }}
       activeOptions={{ exact: to === "/" }}
     >
       {label}
