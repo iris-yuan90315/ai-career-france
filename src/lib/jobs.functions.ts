@@ -134,7 +134,10 @@ ${markdown.slice(0, 18000)}`;
     const text = await res.text();
     throw new Error(`AI extract failed [${res.status}]: ${text.slice(0, 300)}`);
   }
-  const json = await res.json();
+  const text = await res.text();
+  if (!text) return [];
+  let json: any;
+  try { json = JSON.parse(text); } catch { return []; }
   const args =
     json?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
   try {
@@ -210,7 +213,10 @@ Description: ${(job.description ?? "").slice(0, 1500)}`;
     }),
   });
   if (!res.ok) return { score: 0, reason: "scoring unavailable" };
-  const json = await res.json();
+  const text = await res.text();
+  if (!text) return { score: 0, reason: "empty response" };
+  let json: any;
+  try { json = JSON.parse(text); } catch { return { score: 0, reason: "bad json" }; }
   const args =
     json?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
   try {
