@@ -253,6 +253,30 @@ function absUrl(u: string, base: string): string {
   }
 }
 
+function normalizeJobSearchQuery(query: string) {
+  const trimmed = query.trim();
+  if (/\b(job|jobs|career|careers|hiring|opening|openings|role|roles)\b/i.test(trimmed)) {
+    return trimmed;
+  }
+  return `${trimmed} jobs careers`;
+}
+
+function isLikelyJobResult(result: { title?: string; url?: string; description?: string }) {
+  const text = `${result.title ?? ""} ${result.description ?? ""} ${result.url ?? ""}`.toLowerCase();
+  const positiveSignals = [
+    /\b(job|jobs|hiring|opening|openings|apply|application|career|careers|position|vacancy)\b/,
+    /greenhouse|lever|ashby|workday|smartrecruiters|job-boards|jobs\./,
+    /builtin|wellfound|indeed|ziprecruiter|welcome to the jungle|aijobs/,
+  ];
+  const negativeSignals = [
+    /\breddit\b|\byoutube\b|\bmedium\b|community\.|forum|discussion/,
+    /\bcertificate\b|\bcourse\b|\bbadge\b|\btraining\b|bootcamp/,
+    /what is|how to become|where to start|anyway|guide|blog|insight|article/,
+  ];
+
+  return positiveSignals.some((pattern) => pattern.test(text)) && !negativeSignals.some((pattern) => pattern.test(text));
+}
+
 async function processAndStoreJobs(
   extracted: ExtractedJob[],
   base: string,
@@ -375,7 +399,21 @@ export const searchWeb = createServerFn({ method: "POST" })
     z.object({ query: z.string().min(3).max(200) }).parse(d),
   )
   .handler(async ({ data }) => {
-    const results = await firecrawlSearch(data.query, 8);
+    const baseQuery = normalizeJobSearchQuery(data.query);
+    const searchQueries = [
+      baseQuery,
+      `site:greenhouse.io ${data.query}`,
+      `site:lever.co ${data.query}`,
+    ];
+
+    const rawResults = await Promise.all(
+      searchQueries.map((query) => firecrawlSearch(query, 6).catch(() => [])),
+    );
+    const dedupedResults = rawResults
+      .flat()
+      .filter((result) => result?.url)
+      .filter((result, index, arr) => arr.findIndex((item) => item.url === result.url) === index);
+    const results = dedupedResults.filter(isLikelyJobResult).slice(0, 10);
     const prefs = await loadPrefs();
 
     const urls = results.map((r) => r.url).filter(Boolean) as string[];
