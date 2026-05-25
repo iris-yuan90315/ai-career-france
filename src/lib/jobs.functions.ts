@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const GATEWAY = "https://connector-gateway.lovable.dev/firecrawl/v2";
+const FIRECRAWL_URL = "https://api.firecrawl.dev/v2";
 const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 function requireKeys() {
@@ -14,12 +14,11 @@ function requireKeys() {
 }
 
 async function firecrawlScrape(url: string): Promise<string> {
-  const { lovable, fc } = requireKeys();
-  const res = await fetch(`${GATEWAY}/scrape`, {
+  const { fc } = requireKeys();
+  const res = await fetch(`${FIRECRAWL_URL}/scrape`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${lovable}`,
-      "X-Connection-Api-Key": fc,
+      Authorization: `Bearer ${fc}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -37,12 +36,11 @@ async function firecrawlScrape(url: string): Promise<string> {
 }
 
 async function firecrawlSearch(query: string, limit = 15) {
-  const { lovable, fc } = requireKeys();
-  const res = await fetch(`${GATEWAY}/search`, {
+  const { fc } = requireKeys();
+  const res = await fetch(`${FIRECRAWL_URL}/search`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${lovable}`,
-      "X-Connection-Api-Key": fc,
+      Authorization: `Bearer ${fc}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ query, limit }),
