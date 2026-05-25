@@ -134,7 +134,10 @@ ${markdown.slice(0, 18000)}`;
     const text = await res.text();
     throw new Error(`AI extract failed [${res.status}]: ${text.slice(0, 300)}`);
   }
-  const json = await res.json();
+  const text = await res.text();
+  if (!text) return [];
+  let json: any;
+  try { json = JSON.parse(text); } catch { return []; }
   const args =
     json?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
   try {
