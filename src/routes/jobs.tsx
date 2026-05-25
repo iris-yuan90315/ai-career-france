@@ -74,20 +74,26 @@ function JobsPage() {
   const webSearch = useServerFn(searchWeb);
   const searchMut = useMutation({
     mutationFn: (q: string) => webSearch({ data: { query: q } }),
-    onSuccess: (r) => {
-      toast.success(`Found ${r.found}, added ${r.added}`);
+    onMutate: (q) => {
+      const id = toast.loading(`Searching the web for "${q}"…`, { duration: Infinity });
+      return { id };
+    },
+    onSuccess: (r, _q, ctx) => {
+      toast.success(`Found ${r.found}, added ${r.added}`, { id: ctx?.id });
       qc.invalidateQueries({ queryKey: ["jobs"] });
     },
-    onError: (e) => toast.error((e as Error).message),
+    onError: (e, _q, ctx) => toast.error((e as Error).message, { id: ctx?.id }),
   });
 
   const rescore = useServerFn(rescoreAll);
   const rescoreMut = useMutation({
     mutationFn: () => rescore({}),
-    onSuccess: (r) => {
-      toast.success(`Rescored ${r.updated} jobs`);
+    onMutate: () => ({ id: toast.loading("Re-scoring jobs…", { duration: Infinity }) }),
+    onSuccess: (r, _v, ctx) => {
+      toast.success(`Rescored ${r.updated} jobs`, { id: ctx?.id });
       qc.invalidateQueries({ queryKey: ["jobs"] });
     },
+    onError: (e, _v, ctx) => toast.error((e as Error).message, { id: ctx?.id }),
   });
 
   const saveJob = useMutation({
