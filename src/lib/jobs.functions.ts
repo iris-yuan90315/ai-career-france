@@ -369,40 +369,48 @@ export const searchWeb = createServerFn({ method: "POST" })
     z.object({ query: z.string().min(3).max(200) }).parse(d),
   )
   .handler(async ({ data }) => {
-    const results = await firecrawlSearch(data.query, 10);
-    // Insert each result as a candidate job (AI will score them based on title/desc only)
+    const results = await firecrawlSearch(data.query, 8);
     const prefs = await loadPrefs();
+
+    const urls = results.map((r) => r.url).filter(Boolean) as string[];
+    const { data: existingRows } = urls.length
+      ? await supabaseAdmin.from("jobs").select("url").in("url", urls)
+      : { data: [] as { url: string }[] };
+    const existingSet = new Set((existingRows ?? []).map((r) => r.url));
+    const fresh = results.filter((r) => r.url && !existingSet.has(r.url));
+
+    // Score in parallel to avoid worker timeout
+    const scored = await Promise.all(
+      fresh.map(async (r) => {
+        const text = (r.title ?? "") + " " + (r.description ?? r.snippet ?? "");
+        const job = {
+          title: r.title ?? "Untitled role",
+          description: r.description ?? r.snippet ?? "",
+          is_ai_native: /ai|llm|ml/i.test(text),
+          remote_ok: /remote/i.test(text),
+          france_ok: /france|paris|lyon/i.test(text),
+        };
+        const score = await aiScoreJob(job, prefs).catch(() => ({ score: 50, reason: "default" }));
+        return { r, job, score };
+      }),
+    );
+
+    const rows = scored.map(({ r, job, score }) => ({
+      title: job.title,
+      url: r.url,
+      description: job.description,
+      is_ai_native: job.is_ai_native,
+      remote_ok: job.remote_ok,
+      france_ok: job.france_ok,
+      fit_score: score.score,
+      fit_reason: score.reason,
+      source: "search",
+    }));
+
     let added = 0;
-    for (const r of results) {
-      const url = r.url;
-      if (!url) continue;
-      const { data: existing } = await supabaseAdmin
-        .from("jobs")
-        .select("id")
-        .eq("url", url)
-        .maybeSingle();
-      if (existing) continue;
-      const job = {
-        title: r.title ?? "Untitled role",
-        description: r.description ?? r.snippet ?? "",
-        location: undefined as string | undefined,
-        is_ai_native: /ai|llm|ml/i.test((r.title ?? "") + " " + (r.description ?? "")),
-        remote_ok: /remote/i.test((r.title ?? "") + " " + (r.description ?? "")),
-        france_ok: /france|paris|lyon/i.test((r.title ?? "") + " " + (r.description ?? "")),
-      };
-      const score = await aiScoreJob(job, prefs);
-      const { error } = await supabaseAdmin.from("jobs").insert({
-        title: job.title,
-        url,
-        description: job.description,
-        is_ai_native: job.is_ai_native,
-        remote_ok: job.remote_ok,
-        france_ok: job.france_ok,
-        fit_score: score.score,
-        fit_reason: score.reason,
-        source: "search",
-      });
-      if (!error) added++;
+    if (rows.length) {
+      const { error } = await supabaseAdmin.from("jobs").insert(rows);
+      if (!error) added = rows.length;
     }
     return { added, found: results.length };
   });
