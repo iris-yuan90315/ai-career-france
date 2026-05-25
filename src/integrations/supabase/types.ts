@@ -14,7 +14,181 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      applications: {
+        Row: {
+          applied_at: string | null
+          contact: string | null
+          created_at: string
+          id: string
+          job_id: string
+          next_action: string | null
+          next_action_at: string | null
+          notes: string | null
+          status: Database["public"]["Enums"]["application_status"]
+          updated_at: string
+        }
+        Insert: {
+          applied_at?: string | null
+          contact?: string | null
+          created_at?: string
+          id?: string
+          job_id: string
+          next_action?: string | null
+          next_action_at?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["application_status"]
+          updated_at?: string
+        }
+        Update: {
+          applied_at?: string | null
+          contact?: string | null
+          created_at?: string
+          id?: string
+          job_id?: string
+          next_action?: string | null
+          next_action_at?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["application_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          careers_url: string
+          created_at: string
+          id: string
+          last_scraped_at: string | null
+          name: string
+          notes: string | null
+        }
+        Insert: {
+          careers_url: string
+          created_at?: string
+          id?: string
+          last_scraped_at?: string | null
+          name: string
+          notes?: string | null
+        }
+        Update: {
+          careers_url?: string
+          created_at?: string
+          id?: string
+          last_scraped_at?: string | null
+          name?: string
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      jobs: {
+        Row: {
+          company_id: string | null
+          company_name: string | null
+          description: string | null
+          fit_reason: string | null
+          fit_score: number
+          france_ok: boolean
+          hidden: boolean
+          id: string
+          is_ai_native: boolean
+          location: string | null
+          posted_at: string | null
+          remote_ok: boolean
+          scraped_at: string
+          seniority: string | null
+          source: string
+          title: string
+          url: string
+        }
+        Insert: {
+          company_id?: string | null
+          company_name?: string | null
+          description?: string | null
+          fit_reason?: string | null
+          fit_score?: number
+          france_ok?: boolean
+          hidden?: boolean
+          id?: string
+          is_ai_native?: boolean
+          location?: string | null
+          posted_at?: string | null
+          remote_ok?: boolean
+          scraped_at?: string
+          seniority?: string | null
+          source?: string
+          title: string
+          url: string
+        }
+        Update: {
+          company_id?: string | null
+          company_name?: string | null
+          description?: string | null
+          fit_reason?: string | null
+          fit_score?: number
+          france_ok?: boolean
+          hidden?: boolean
+          id?: string
+          is_ai_native?: boolean
+          location?: string | null
+          posted_at?: string | null
+          remote_ok?: boolean
+          scraped_at?: string
+          seniority?: string | null
+          source?: string
+          title?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      preferences: {
+        Row: {
+          id: number
+          keywords_exclude: string[]
+          keywords_include: string[]
+          locations: string[]
+          min_comp: number | null
+          profile_summary: string | null
+          seniorities: string[]
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          keywords_exclude?: string[]
+          keywords_include?: string[]
+          locations?: string[]
+          min_comp?: number | null
+          profile_summary?: string | null
+          seniorities?: string[]
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          keywords_exclude?: string[]
+          keywords_include?: string[]
+          locations?: string[]
+          min_comp?: number | null
+          profile_summary?: string | null
+          seniorities?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +197,12 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      application_status:
+        | "interested"
+        | "applied"
+        | "interview"
+        | "offer"
+        | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +329,14 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      application_status: [
+        "interested",
+        "applied",
+        "interview",
+        "offer",
+        "rejected",
+      ],
+    },
   },
 } as const
