@@ -401,24 +401,38 @@ export const searchWeb = createServerFn({ method: "POST" })
       }),
     );
 
-    const rows = scored.map(({ r, job, score }) => ({
-      title: job.title,
-      url: r.url,
-      description: job.description,
-      is_ai_native: job.is_ai_native,
-      remote_ok: job.remote_ok,
-      france_ok: job.france_ok,
-      fit_score: score.score,
-      fit_reason: score.reason,
-      source: "search",
-    }));
+    // Dedupe within the batch (firecrawl can return same URL twice)
+    const seen = new Set<string>();
+    const rows = scored
+      .filter(({ r }) => {
+        if (!r.url || seen.has(r.url)) return false;
+        seen.add(r.url);
+        return true;
+      })
+      .map(({ r, job, score }) => ({
+        title: job.title,
+        url: r.url,
+        description: job.description,
+        is_ai_native: job.is_ai_native,
+        remote_ok: job.remote_ok,
+        france_ok: job.france_ok,
+        fit_score: score.score,
+        fit_reason: score.reason,
+        source: "search",
+      }));
 
     let added = 0;
+    const errors: string[] = [];
     if (rows.length) {
-      const { error } = await supabaseAdmin.from("jobs").insert(rows);
-      if (!error) added = rows.length;
+      // Upsert with ignoreDuplicates so a single conflict doesn't drop the batch
+      const { data: inserted, error } = await supabaseAdmin
+        .from("jobs")
+        .upsert(rows, { onConflict: "url", ignoreDuplicates: true })
+        .select("id");
+      if (error) errors.push(error.message);
+      else added = inserted?.length ?? 0;
     }
-    return { added, found: results.length };
+    return { added, found: results.length, errors };
   });
 
 export const rescoreAll = createServerFn({ method: "POST" }).handler(async () => {
