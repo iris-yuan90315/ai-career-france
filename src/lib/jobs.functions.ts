@@ -2,7 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const FIRECRAWL_URL = "https://api.firecrawl.dev/v2";
+const FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v2/scrape";
+// Search lives on v1 — Firecrawl's v2 API exposes scrape/crawl but not search
+const FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v1/search";
 const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 function requireKeys() {
@@ -15,7 +17,7 @@ function requireKeys() {
 
 async function firecrawlScrape(url: string): Promise<string> {
   const { fc } = requireKeys();
-  const res = await fetch(`${FIRECRAWL_URL}/scrape`, {
+  const res = await fetch(FIRECRAWL_SCRAPE_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${fc}`,
@@ -37,7 +39,7 @@ async function firecrawlScrape(url: string): Promise<string> {
 
 async function firecrawlSearch(query: string, limit = 15) {
   const { fc } = requireKeys();
-  const res = await fetch(`${FIRECRAWL_URL}/search`, {
+  const res = await fetch(FIRECRAWL_SEARCH_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${fc}`,
@@ -50,7 +52,8 @@ async function firecrawlSearch(query: string, limit = 15) {
     throw new Error(`Firecrawl search failed [${res.status}]: ${text.slice(0, 300)}`);
   }
   const json = await res.json();
-  const web = json?.data?.web ?? json?.web ?? json?.data ?? [];
+  // Handle multiple possible response shapes from Firecrawl
+  const web = json?.data?.web ?? json?.web ?? json?.results ?? json?.data ?? [];
   return Array.isArray(web) ? web : [];
 }
 
@@ -261,8 +264,10 @@ function normalizeJobSearchQuery(query: string) {
   return `${trimmed} jobs careers`;
 }
 
-function isLikelyJobResult(result: { title?: string; url?: string; description?: string }) {
-  const text = `${result.title ?? ""} ${result.description ?? ""} ${result.url ?? ""}`.toLowerCase();
+function isLikelyJobResult(result: { title?: string; url?: string; description?: string; snippet?: string; markdown?: string; content?: string }) {
+  // Combine all available text fields — Firecrawl may use different field names across API versions
+  const bodyText = result.description ?? result.snippet ?? result.content ?? (result.markdown ?? "").slice(0, 500);
+  const text = `${result.title ?? ""} ${bodyText} ${result.url ?? ""}`.toLowerCase();
   const positiveSignals = [
     /\b(job|jobs|hiring|opening|openings|apply|application|career|careers|position|vacancy)\b/,
     /greenhouse|lever|ashby|workday|smartrecruiters|job-boards|jobs\./,
@@ -406,9 +411,22 @@ export const searchWeb = createServerFn({ method: "POST" })
       `site:lever.co ${data.query}`,
     ];
 
-    const rawResults = await Promise.all(
-      searchQueries.map((query) => firecrawlSearch(query, 6).catch(() => [])),
+    const searchErrors: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawResults: any[][] = await Promise.all(
+      searchQueries.map((query) =>
+        firecrawlSearch(query, 6).catch((e: Error) => {
+          searchErrors.push(e.message);
+          return [];
+        }),
+      ),
     );
+
+    // If every query failed, surface the first error so the user sees an error toast
+    if (searchErrors.length === searchQueries.length) {
+      throw new Error(searchErrors[0] ?? "All Firecrawl search queries failed");
+    }
+
     const dedupedResults = rawResults
       .flat()
       .filter((result) => result?.url)
@@ -426,13 +444,21 @@ export const searchWeb = createServerFn({ method: "POST" })
     // Score in parallel to avoid worker timeout
     const scored = await Promise.all(
       fresh.map(async (r) => {
-        const text = (r.title ?? "") + " " + (r.description ?? r.snippet ?? "");
+        // Firecrawl v1 search results may use title/description, snippet, markdown, or content
+        const titleRaw: string = r.title ?? r.metadata?.title ?? "";
+        const bodyRaw: string =
+          r.description ??
+          r.snippet ??
+          r.content ??
+          r.metadata?.description ??
+          (r.markdown ?? "").slice(0, 4000);
+        const text = `${titleRaw} ${bodyRaw}`;
         const job = {
-          title: r.title ?? "Untitled role",
-          description: r.description ?? r.snippet ?? "",
-          is_ai_native: /ai|llm|ml/i.test(text),
-          remote_ok: /remote/i.test(text),
-          france_ok: /france|paris|lyon/i.test(text),
+          title: titleRaw || "Untitled role",
+          description: bodyRaw,
+          is_ai_native: /\bai\b|llm|ml\b|machine.learning|artificial.intel/i.test(text),
+          remote_ok: /\bremote\b/i.test(text),
+          france_ok: /\bfrance\b|\bparis\b|\blyon\b|\bnantes\b|\bbordeau/i.test(text),
         };
         const score = await aiScoreJob(job, prefs).catch(() => ({ score: 50, reason: "default" }));
         return { r, job, score };
